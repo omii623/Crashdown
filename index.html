@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Crashdown</title>
+    <link rel="icon" href="https://toppng.com/uploads/preview/29-aug-2011-internet-explorer-ico-11563212875bqlnwr8nmw.png">
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: gray;
+        }
+
+        p {
+            display: block; 
+            margin: 0 auto;
+        }
+
+        .block {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        #gameboard {
+            position: relative;
+            width: 465px;
+            height: 465px;
+            border: 1px solid black;
+            margin: 0 auto;
+            background-color: darkolivegreen;
+            animation: changeColor 10s infinite;
+        }
+
+        @keyframes changeColor {
+            0% {
+                background-color: darkblue;
+            }
+            25% {
+                background-color: darkred;
+            }
+            50% {
+                background-color: darkgreen;
+            }
+            75% {
+                background-color: darkred;
+            }
+            100% {
+                background-color: darkblue;
+            }
+        }
+
+        #nextLine {
+            position: relative;
+            width: 465px;
+            height: 31px;
+            border: 3px solid black;
+            margin: 0 auto;
+            background-color: darkslategrey;
+        }
+
+        #score {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        #lines {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        #level {
+            text-align: center;
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        table {
+            border: 1px solid black;
+            /* keret */
+            margin: 0 auto;
+            /* középre igazítás */
+        }
+    </style>
+</head>
+
+<body>
+    <div id="gameboard"></div>
+    <div id="nextLine"></div>
+    <div id="score">Score: 0</div>
+    <div id="lines">Lines: 0</div>
+    <div id="level">Level: 1</div>
+    <button id="playButton" style="display: block; margin: 0 auto;">Back music</button>
+    <button id="reset" style="display: block; margin: 0 auto;">Reset</button>
+    <br>
+    <input type="text" id="myInput" style="display: block; margin: 0 auto;">
+    <button id="saveScore" style="display: block; margin: 0 auto;">Save</button>
+    <br>
+    <button id="open-dialog-button" style="display: block; margin: 0 auto;">Leírás</button>
+    <dialog id="my-dialog">
+        <h2>Hi!</h2>
+        <p>5 darab szint van a játékban.</p>
+        <p>A szintek 10,15,25,40,70 sorból állnak.</p>
+        <br>
+        <p>A fekete mezők bombák.</p>
+        <p>Az adott sorban jobb/bal irányba 5 felrobban.</p>
+        <br>
+        <p>A sorok szintenként gyorsabban fognak hozáadódni.</p>
+        <p>Idők 3000, 2850, 2700, 2550, 2400 ms.</p>
+        <br>
+        <button id="close-dialog-button">Bezárás</button>
+    </dialog>
+    <br>
+    <table>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Point</th>
+            </tr>
+        </thead>
+        <tbody id="table-body">
+        </tbody>
+    </table>
+
+    <script>//dialog
+        const openDialogButton = document.querySelector('#open-dialog-button');
+        const closeDialogButton = document.querySelector('#close-dialog-button');
+        const myDialog = document.querySelector('#my-dialog');
+      
+        openDialogButton.addEventListener('click', () => {
+          myDialog.showModal();
+        });
+      
+        closeDialogButton.addEventListener('click', () => {
+          myDialog.close();
+        });
+    </script>
+
+    <script>
+        var gameboard = document.getElementById("gameboard");
+        var nextLine = document.getElementById("nextLine");
+        var scoreDiv = document.getElementById("score");
+        var linesDiv = document.getElementById("lines");
+        var levelDiv = document.getElementById("level");
+        var myInput = document.getElementById("myInput");
+        myInput.value = "user";
+        var tbody = document.getElementById("table-body");
+
+        var level = [10, 15, 25, 40, 70];
+        var time1 = [200, 190, 180, 170, 160];
+        var time2 = [3000, 2850, 2700, 2550, 2400];
+        var levelId = 0;
+        var blocks = [];
+        var topList = [];
+        var game = true;
+        var endGame = false;
+        var shot = new Audio('mp3/shot.mp3');
+        var error = new Audio('mp3/error.mp3');
+        var success = new Audio('mp3/success.mp3');
+        var loop = new Audio('mp3/loop.mp3');
+        var loopPlay = false;
+        //loop.volume = 0.1;
+        shot.volume = 0.2;
+        error.volume = 0.4;
+
+        //---------------main--------------------
+
+        for (var i = 0; i < 15; i++)//delarate array null
+        {
+            var row = [];
+            for (var j = 0; j < 15; j++) {
+                row.push(null);
+            }
+            blocks.push(row);
+        }
+
+        resetBlocks();
+
+        //--------------loops----------------------
+
+        setInterval(function () {//graviti and game chack
+            var currentTime = new Date().getTime();
+            if (currentTime - window.performance.timing.navigationStart >= 100 && game) {
+                downBlocks();
+                for (var i = 0; i < 15; i++) {
+                    if (blocks[0][i] != null) {
+                        game = false;
+                        endGame = true;
+                        errorAudio();
+                    }
+                }
+                if (parseInt(linesDiv.innerHTML.split(": ")[1]) == level[levelId]) {
+                    game = false
+                    successAudio();
+                }
+                if (!game && levelId < 4 && !endGame) {
+                    resetBlocks();
+                    levelId++;
+                    levelDiv.innerHTML = "Level: " + (levelId + 1);
+                    game = true;
+                }
+            }
+        }, 100);
+
+        setInterval(function () {//add next line
+            var currentTime = new Date().getTime();
+            if (currentTime - window.performance.timing.navigationStart >= time2[levelId] && game) {
+                nextLineRow();
+            }
+        }, time2[levelId]);
+
+        //--------------events---------------------
+
+        reset.addEventListener('click', () => {
+            game = true;
+            endGame = false;
+            levelId = 0;
+            resetBlocks();
+            levelDiv.innerHTML = "Level: 1";
+            linesDiv.innerHTML = "Lines: 0";
+            scoreDiv.innerHTML = "Score: 0";
+        });
+
+        saveScore.addEventListener('click', () => {
+            var point = parseInt(scoreDiv.innerHTML.split(": ")[1]);
+            var name = myInput.value;
+            var cJson = {name:name,point:point}
+
+            topList.push(cJson);
+
+            topList.sort((a, b) => {
+                const numA = Number(a.point);
+                const numB = Number(b.point);
+                return - numA + numB;
+            });
+
+            while (tbody.firstChild) {
+                tbody.removeChild(tbody.firstChild);
+            }
+
+            topList.forEach((item) => {
+                const tr = document.createElement("tr");
+                tr.innerHTML = `<td>${item.name}</td><td>${item.point}</td>`;
+                tbody.appendChild(tr);
+            });
+        });
+
+        playButton.addEventListener('click', () => {
+            loopPlay = !loopPlay;
+            if (loopPlay) {
+                this.currentTime = 0;
+                loop.play();
+            } else {
+                loop.pause();
+            }
+        });
+
+        loop.addEventListener('ended', function () {
+            if (loopPlay) {
+                this.currentTime = 0;
+                this.play();
+            }
+        }, false);
+
+        //---------------functions-----------------
+
+        function addRow(vertical) {
+            for (var j = 0; j < 15; j++) {
+                var block = document.createElement("div");
+                block.className = "block";
+                block.style.top = (vertical * 31) + "px";
+                block.style.left = (j * 31) + "px";
+                block.style.backgroundColor = getRandomColor();
+                block.addEventListener("click", removeBlocksEvent);
+                gameboard.appendChild(block);
+                blocks[vertical][j] = block;
+            }
+            return row;
+        }
+
+        async function nextLineRow() {
+            var row = [];
+            for (var j = 0; j < 15; j++) {
+                var block = document.createElement("div");
+                block.className = "block";
+                block.style.top = (0) + "px";
+                block.style.left = (j * 31) + "px";
+                block.style.backgroundColor = getRandomColor();
+                nextLine.appendChild(block);
+                row.push(block);
+                await wait(time1[levelId]);
+                if (!getGame()) {
+                    console.log("finish");
+                    for (var k = 0; k < j + 1; k++) {
+                        row[k].parentNode.removeChild(row[k]);
+                    }
+                    return null;
+                }
+            }
+            upRow();
+            for (var k = 0; k < 15; k++) {
+                var block = document.createElement("div");
+                block.className = "block";
+                block.style.top = (14 * 31) + "px";
+                block.style.left = (k * 31) + "px";
+                block.style.backgroundColor = row[k].style.backgroundColor;
+                block.addEventListener("click", removeBlocksEvent);
+                gameboard.appendChild(block);
+                row[k].parentNode.removeChild(row[k]);
+                blocks[14][k] = block;
+            }
+            linesDiv.innerHTML = "Lines: " + (parseInt(linesDiv.innerHTML.split(": ")[1]) + 1);
+        }
+
+        function getGame() {
+            return game;
+        }
+
+        function upRow() {
+            for (var i = 0; i < 15; i++) {
+                for (var j = 0; j < 15; j++) {
+                    if (i == 0) {
+                        try {
+                            blocks[i][j].parentNode.removeChild(blocks[i][j]);
+                            blocks[i][j] = null;
+                        } catch (error) { }
+                    } else {
+                        try {
+                            blocks[i - 1][j] = blocks[i][j];
+                            blocks[i][j] = null;
+                            blocks[i - 1][j].style.top = ((i - 1) * 31) + "px";
+                        } catch (error) { }
+                    }
+                }
+            }
+        }
+
+        function getRandomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+
+        function getRandomColor() {
+            var color = "#";
+            var randNum = getRandomInt(31);
+            switch (true) {
+                case (randNum<10):
+                    color += "FF0000";
+                    break;
+                case (randNum>=10 && randNum<20):
+                    color += "00FF00";
+                    break;
+                case (randNum>=20 && randNum<30):
+                    color += "0000FF";
+                    break;
+                default:
+                    color += "000000";
+                    break;
+            }
+            return color;
+        }
+
+        function shotAudio() {
+            shot.currentTime = 0;
+            shot.play();
+        }
+
+        function errorAudio() {
+            error.currentTime = 0;
+            error.play();
+        }
+
+        function successAudio() {
+            success.currentTime = 0;
+            success.play();
+        }
+
+        function removeBlocksEvent(event) {
+            if (!game) {
+                return null;
+            }
+            var block = event.target;
+            var row = Math.floor(parseInt(block.style.top) / 31);
+            var col = Math.floor(parseInt(block.style.left) / 31);
+            var color = blocks[row][col].style.backgroundColor;
+            var block_save = blocks[row][col];
+
+            let rgb = color.replace(/[^\d,]/g, '').split(',');
+            let intensity = (parseInt(rgb[0]) + parseInt(rgb[1]) + parseInt(rgb[2])) / 3;
+
+            if (intensity < 10) {
+                //console.log("A szín fekete.");
+                for(var i = -5;i<6;i++)
+                try {
+                    blocks[row][col+i].parentNode.removeChild(blocks[row][col+i]);
+                    blocks[row][col+i] = null;
+                } catch (error) {}
+                scoreDiv.innerHTML = "Score: " + (parseInt(scoreDiv.innerHTML.split(": ")[1]) + 13);
+                shotAudio();
+                return null;
+            }
+
+            var count = 1;
+            blocks[row][col] = null;
+
+            try {
+                if (blocks[row - 1][col].style.backgroundColor == color)//sor - 1
+                {
+                    count = removeBlocksId(row - 1, col, count, color);
+                }
+            } catch (error) { }
+
+            try {
+                if (blocks[row + 1][col].style.backgroundColor == color)//sor + 1
+                {
+                    count = removeBlocksId(row + 1, col, count, color);
+                }
+            } catch (error) { }
+
+            try {
+                if (blocks[row][col - 1].style.backgroundColor == color)//oszlop - 1
+                {
+                    count = removeBlocksId(row, col - 1, count, color);
+                }
+            } catch (error) { }
+
+            try {
+                if (blocks[row][col + 1].style.backgroundColor == color)//oszlop + 1
+                {
+                    count = removeBlocksId(row, col + 1, count, color);
+                }
+            } catch (error) { }
+
+            if (count > 1) {
+                block_save.parentNode.removeChild(block_save);
+                blocks[row][col] = null;
+                scoreDiv.innerHTML = "Score: " + (parseInt(scoreDiv.innerHTML.split(": ")[1]) + count);
+                shotAudio();
+            } else {
+                blocks[row][col] = block_save;
+            }
+        }
+
+        function removeBlocksId(row, col, count, color) {
+            var block_save = blocks[row][col];
+            blocks[row][col] = null;
+            block_save.parentNode.removeChild(block_save);
+            count++;
+
+            try {
+                if (blocks[row - 1][col].style.backgroundColor == color)//sor - 1
+                {
+                    count = removeBlocksId(row - 1, col, count, color);
+                }
+            } catch (error) { }
+
+            try {
+                if (blocks[row + 1][col].style.backgroundColor == color)//sor + 1
+                {
+                    count = removeBlocksId(row + 1, col, count, color);
+                }
+            } catch (error) { }
+
+            try {
+                if (blocks[row][col - 1].style.backgroundColor == color)//oszlop - 1
+                {
+                    count = removeBlocksId(row, col - 1, count, color);
+                }
+            } catch (error) { }
+
+            try {
+                if (blocks[row][col + 1].style.backgroundColor == color)//oszlop + 1
+                {
+                    count = removeBlocksId(row, col + 1, count, color);
+                }
+            } catch (error) { }
+
+            return count;
+        }
+
+        async function downBlocks() {
+            for (let k = 0; k < blocks.length; k++) {
+                for (let i = blocks.length - 1; i >= 0; i--) {
+                    for (let j = 0; j < blocks[i].length; j++) {
+                        try {
+                            if (blocks[i][j] == null) {
+                                blocks[i][j] = blocks[i - 1][j];
+                                blocks[i - 1][j] = null;
+                                blocks[i][j].style.top = (i * 31) + "px";
+                                blocks[i][j].style.left = (j * 31) + "px";
+                            }
+                        } catch (error) { }
+                    }
+                }
+            }
+            centerBlocks()
+        }
+
+        function centerBlocks() {
+            for (var j = 0; j < 7; j++)
+                for (var k = 0; k < blocks.length; k++) {
+                    if (blocks[14][k] == null) {
+                        if (k < 8) {
+                            if (k - 1 != -1) {
+                                for (var i = 0; i < 15; i++) {
+                                    blocks[i][k] = blocks[i][k - 1];
+                                    blocks[i][k - 1] = null;
+                                    if (blocks[i][k] != null) {
+                                        blocks[i][k].style.left = (k * 31) + "px";
+                                    }
+                                }
+                            }
+                        } else {
+                            if (k + 1 != 15) {
+                                for (var i = 0; i < 15; i++) {
+                                    blocks[i][k] = blocks[i][k + 1];
+                                    blocks[i][k + 1] = null;
+                                    if (blocks[i][k] != null) {
+                                        blocks[i][k].style.left = (k * 31) + "px";
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+        }
+
+        function resetBlocks()//reset blocks
+        {
+            for (var i = 0; i < 15; i++) {
+                for (var j = 0; j < 15; j++) {
+                    try {
+                        blocks[i][j].parentNode.removeChild(blocks[i][j]);
+                        blocks[i][j] = null;
+                    } catch (error) { }
+                }
+            }
+            linesDiv.innerHTML = "Lines: " + (0);
+            for (var i = 14; i > 10; i--)//alap inicizálása 
+            {
+                addRow(i);
+            }
+        }
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+    </script>
+</body>
+</html>
